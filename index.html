@@ -34,6 +34,7 @@ td:first-child,th:first-child{position:sticky;left:0;z-index:1}
 td:first-child{background:var(--card)}
 th:first-child{background:var(--bg)}
 .act{margin-top:12px}
+.row[hidden]{display:none}
 @media (max-width:600px){
   main{padding:14px 10px 36px}
   .card{padding:12px}
@@ -55,9 +56,14 @@ th:first-child{background:var(--bg)}
       <select id="method">
         <option value="H">Hondt (1, 2, 3, 4, …)</option>
         <option value="S">Sainte-Laguë (1, 3, 5, 7, …)</option>
+        <option value="C">Personalizado (escolho os divisores)</option>
       </select></label>
     <label>Mandatos a distribuir:
       <input id="seats" class="sm" type="number" min="1" max="40" value="7"></label>
+  </div>
+  <div class="row" id="custRow" hidden>
+    <label>Divisores (separa com espaço ou ponto e vírgula; decimais com vírgula):
+      <input id="cust" class="nm" value="1; 2; 3; 4; 5; 6; 7"></label>
   </div>
   <div id="inputs"></div>
   <div class="row">
@@ -100,10 +106,17 @@ function fmt(x){return x.toLocaleString('pt-PT',{maximumFractionDigits:2})}
 
 function calc(){
   const N=Math.min(40,Math.max(1,parseInt($('seats').value)||1));
-  const hondt=$('method').value==='H';
-  const divs=Array.from({length:N},(_,k)=>hondt?k+1:2*k+1);
-  $('title').textContent=hondt?'Método de Hondt':'Método de Sainte-Laguë';
-  $('sub').textContent=hondt?'Divisores: 1, 2, 3, 4, 5, …':'Divisores: 1, 3, 5, 7, 9, … (números ímpares)';
+  const m=$('method').value;
+  $('custRow').hidden=m!=='C';
+  let divs=Array.from({length:N},(_,k)=>m==='S'?2*k+1:k+1),err='';
+  if(m==='C'){
+    const toks=$('cust').value.split(/[;\s]+/).filter(Boolean);
+    divs=toks.map(t=>/^\d+([.,]\d+)?$/.test(t)?parseFloat(t.replace(',','.')):NaN);
+    if(!divs.length||divs.some(d=>!(d>0))){divs=[];err='⚠ Divisores inválidos. Usa números positivos separados por espaço ou ponto e vírgula (ex.: 1; 1,4; 3; 5).'}
+  }
+  $('title').textContent=m==='H'?'Método de Hondt':m==='S'?'Método de Sainte-Laguë':'Método personalizado';
+  $('sub').style.color=err?'#b45309':'';
+  $('sub').textContent=err||(m==='H'?'Divisores: 1, 2, 3, 4, 5, …':m==='S'?'Divisores: 1, 3, 5, 7, 9, … (números ímpares)':'Divisores escolhidos: '+divs.map(fmt).join('; '));
 
   const q=lists.map((l,i)=>divs.map(d=>({i,v:l.v/d})));
   const all=q.flat().sort((a,b)=>b.v-a.v||a.i-b.i);
@@ -115,7 +128,7 @@ function calc(){
   let h='<table><tr><th>Divisor</th>'+lists.map(l=>`<th>${esc(l.n)}</th>`).join('')+'</tr>';
   h+='<tr><th>Votos</th>'+lists.map(l=>`<th>${fmt(l.v)}</th>`).join('')+'</tr>';
   divs.forEach((d,k)=>{
-    h+=`<tr><td><b>${d}</b></td>`;
+    h+=`<tr><td><b>${fmt(d)}</b></td>`;
     lists.forEach((l,i)=>{
       const c=q[i][k],r=rank.get(c);
       h+=`<td class="${showHl&&r?'e':''}">${fmt(c.v)}${showHl&&r?`<span class="o">(${r}º)</span>`:''}</td>`;
@@ -139,6 +152,7 @@ function calc(){
 $('add').onclick=()=>{lists.push({n:'Lista '+String.fromCharCode(65+lists.length%26),v:0});buildInputs();calc()};
 $('clear').onclick=()=>{lists.forEach(l=>l.v=0);buildInputs();calc()};
 $('seats').oninput=calc;
+$('cust').oninput=calc;
 $('method').onchange=()=>{showHl=false;calc()};
 $('hl').onclick=()=>{showHl=!showHl;calc()};
 buildInputs();calc();
